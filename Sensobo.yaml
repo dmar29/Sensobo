@@ -1,0 +1,158 @@
+esphome:
+  name: Sensobo
+  platform: ESP8266
+  board: d1_mini
+
+wifi:
+  ssid: "YOUR_SSID"
+  password: "YOUR_PW"
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Sensobo Fallback Hotspot"
+    password: "YOUR_PW"
+
+captive_portal:
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  password: "YOUR_PW"
+
+ota:
+  password: "YOUR_PW"
+
+# Zeit von HomeAssistant
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+
+    
+# i2c-Bus für die Übertragung ans Display und BME680
+i2c:
+  sda: D1
+  scl: D2
+  
+bme680_bsec:
+    # i2c address
+    # -----------
+    # Common values are:
+    # - 0x76
+    # - 0x77
+    # Default: 0x76
+    address: 0x77
+
+    # Temperature offset
+    # ------------------
+    # Useful if device is in enclosure and reads too high
+    # Default: 0
+    temperature_offset: 0
+
+    # IAQ calculation mode
+    # --------------------
+    # Available options:
+    # - static (for fixed position devices)
+    # - mobile (for on person or other moveable devices)
+    # Default: static
+    iaq_mode: static
+
+    # Sample rate
+    # -----------
+    # Available options:
+    # - lp (low power - samples every 3 seconds)
+    # - ulp (ultra low power - samples every 5 minutes)
+    # Default: lp
+    sample_rate: lp
+
+    # Interval at which to save BSEC state
+    # ------------------------------------
+    # Default: 6h
+    state_save_interval: 6h
+
+sensor:
+  - platform: bme680_bsec
+    temperature:
+      # Temperature in °C
+      name: "BME680 Temperature"
+      id: temperature
+      filters:
+        - median
+    pressure:
+      # Pressure in hPa
+      name: "BME680 Pressure"
+      filters:
+        - median
+    humidity:
+      # Relative humidity %
+      name: "BME680 Humidity"
+      id: humidity
+      filters:
+        - median
+    gas_resistance:
+      # Gas resistance in Ω
+      name: "BME680 Gas Resistance"
+      filters:
+        - median
+    iaq:
+      # Indoor air quality value
+      name: "BME680 IAQ"
+      filters:
+        - median
+    iaq_accuracy:
+      # IAQ accuracy as a numeric value of 0, 1, 2, 3
+      name: "BME680 Numeric IAQ Accuracy"
+    co2_equivalent:
+      # CO2 equivalent estimate in ppm
+      name: "BME680 CO2 Equivalent"
+      filters:
+        - median
+    breath_voc_equivalent:
+      # Volatile organic compounds equivalent estimate in ppm
+      name: "BME680 Breath VOC Equivalent"
+      filters:
+        - median
+
+text_sensor:
+  - platform: bme680_bsec
+    iaq_accuracy:
+      # IAQ accuracy as a text value of Stabilizing, Uncertain, Calibrating, Calibrated
+      name: "BME680 IAQ Accuracy"
+
+# Bewegungsmelder einrichten
+binary_sensor:
+  - platform: gpio
+    pin: D5
+    name: "PIR Sensor"
+    device_class: motion
+    id: motion
+    
+# Sensor für Helligkeit mit digitaler Ausgabe (1/0)
+# Es wird erst nach 500 ms auf Dunkel geschaltet, um ggf. kurze Abdeckungen zu vermeiden.
+  - platform: gpio
+    pin: 
+      number: D6
+      inverted: True
+    name: "Helligkeit"
+    filters:
+      - delayed_off: 500ms
+
+    
+# Font für Display festlegen
+font:
+  - file: "Tahoma Regular font.ttf"
+    id: my_font
+    size: 12
+
+# Display für die Anzeige
+display:
+  - platform: ssd1306_i2c
+    model: "SSD1306 128x32"
+    reset_pin: D0
+    address: 0x3C
+    lambda: |-
+      if (id(motion).state) {
+      it.strftime(0, 0, id(my_font), "Hi, es ist %H:%M Uhr,", id(homeassistant_time).now() );
+      it.printf(0, 20, id(my_font), "%.1f°C und %.1f%%", id(temperature).state, id(humidity).state );
+      }
